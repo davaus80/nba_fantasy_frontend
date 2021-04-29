@@ -227,7 +227,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <p>
-          Twin Fantasy
+          Fantasy App
         </p>
       </header>
       <Container>
