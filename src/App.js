@@ -3,21 +3,28 @@ import logo from './logo.svg';
 import axios from "axios"
 import BootstrapTable from 'react-bootstrap-table-next'
 import Button from 'react-bootstrap/Button'
+import ToggleButton from 'react-bootstrap/ToggleButton'
+import ToggleButtonGroup from 'react-bootstrap/ToggleButtonGroup'
 import Spinner from 'react-bootstrap/Spinner'
 import Form from 'react-bootstrap/Form'
 import Container from 'react-bootstrap/Container'
 import Col from 'react-bootstrap/Col'
 import Row from 'react-bootstrap/Row'
 import './App.css';
+import { ButtonGroup } from "react-bootstrap";
 
 
 function App() {
 
   const [comparisonLoading, setComparisonLoading] = useState(false); // Bool that indicates if the comparison table data is loading or not
   const [tableLoading, setTableLoading] = useState(false); // Bool that indicates if the team table data is loading or not
+  const [showLastSeason, setshowLastSeason] = useState(false) // Bool that indicates whether to show predicted stats or last seasons stats
+    
   const [playerData1, setPlayerData1] = useState([]); // Array of dictionary objects with player data for team 1
+  const [predData1, setPredData1] = useState([]) // Array of dictionary objects with predicted player data for team 1
   const [playerNames1, setPlayerNames1] = useState([]); // Array of player names for team 1
   const [playerData2, setPlayerData2] = useState([]); // Array of dictionary objects with player data for team 2
+  const [predData2, setPredData2] = useState([]) // Array of dictionary objects with predicted player data for team 2
   const [playerNames2, setPlayerNames2] = useState([]); // Array of player names for team 2
   const [playerName, setPlayerName] = useState("") // String currently in the add player form
   const [teamComparison, setTeamComparison] = useState([]); // Array of dictionary objects with team1 total stats, team2 total stats, and the difference
@@ -50,6 +57,20 @@ function App() {
     setTableLoading(false)
   }
 
+  const addPlayerPreds = (newPredInfo, teamNum) => {
+    
+    if (teamNum === 1) {
+      var updatedpredData = predData1;
+      updatedpredData.push(newPredInfo);
+      setPredData1(updatedpredData);
+    } else {
+      var updatedpredData = predData2;
+      updatedpredData.push(newPredInfo);
+      setPredData2(updatedpredData);
+    }
+    setTableLoading(false)
+  }
+
   // Handle the loading and addition of the player with the name in playerName to the team of teamNum
   async function handlePlayerAdd(teamNum) {
     setTableLoading(true);
@@ -57,6 +78,10 @@ function App() {
     const payload = {
       "player_name": playerName,
       "num_statlines": 1,
+    }; 
+    const url2 = "/api/player/predictedstatline"
+    const payload2 = {
+      "player_name": playerName,
     }; 
     axios.post(url, payload)
     .then((postResponse) => {
@@ -67,6 +92,16 @@ function App() {
       console.error(errors);
       setTableLoading(false)
     })
+    axios.post(url2, payload2)
+    .then((postResponse) => {
+         addPlayerPreds(postResponse.data.results[0], teamNum);
+      }
+    )
+    .catch((errors) => {
+      console.error(errors);
+      setTableLoading(false)
+    })
+    
   }
 
   // Handle the deletion of the specified player from the specified team.
@@ -130,24 +165,67 @@ function App() {
     setComparisonLoading(false)
   }
 
-  // handle loading and updating of comparison data
-  async function handleComparison() {
-    setComparisonLoading(true);
-    const url = "/api/statline/compareteams"
-    const payload = {
-      "player_list1": playerNames1,
-      "player_list2": playerNames2,
-    }; 
-    axios.post(url, payload)
-    .then((postResponse) => {
-         handleComparisonData(postResponse.data);
-      }
-    )
-    .catch((errors) => {
-      console.error(errors);
-      setComparisonLoading(false)
-    })
+  function handleComparisonNew() {
+    var team1 = playerData1
+    var team2 = playerData2
+    if (showLastSeason) {
+      team1 = predData1
+      team2 = predData2
+    }
+    const keys = ['fg3m','fgm','fga','ftm','fta','pts','reb','ast','stl','blk','tov']
+    var teamData1 = {}
+    var teamData2 = {}
+    var teamDifference = {}
+    for (const key of keys) {
+      teamData1[key] = team1.reduce(function(sum, current) {
+        return sum + current[key]
+      }, 0);
+      teamData2[key] = team2.reduce(function(sum, current) {
+        return sum + current[key]
+      }, 0);
+      teamDifference[key] = teamData2[key] - teamData1[key];
+    }
+    teamData1["name"] = "Team 1";
+    teamData1["fgpct"] = teamData1["fgm"] / teamData1["fga"]
+    teamData1["ftpct"] = teamData1["ftm"] / teamData1["fta"]
+    teamData2["name"] = "Team 2";
+    teamData2["fgpct"] = teamData2["fgm"] / teamData2["fga"]
+    teamData2["ftpct"] = teamData2["ftm"] / teamData2["fta"]
+    teamDifference["name"] = "Difference";
+    teamDifference["fgpct"] = (teamData2["fgpct"] - teamData1["fgpct"]).toFixed(3)
+    teamDifference["ftpct"] = (teamData2["ftpct"] - teamData1["ftpct"]).toFixed(3)
+    teamData1["fgpct"] = teamData1["fgpct"].toFixed(3)
+    teamData2["fgpct"] = teamData2["fgpct"].toFixed(3)
+    teamData1["ftpct"] = teamData1["ftpct"].toFixed(3)
+    teamData2["ftpct"] = teamData2["ftpct"].toFixed(3)
+    const updatedComparisonData = [teamData1, teamData2, teamDifference];
+    setTeamComparison(updatedComparisonData);
   }
+
+  // handle loading and updating of comparison data
+  // async function handleComparison() {
+  //   setComparisonLoading(true);
+  //   const url = "/api/statline/compareteams"
+  //   const payload = {
+  //     "player_list1": playerNames1,
+  //     "player_list2": playerNames2,
+  //   }; 
+  //   axios.post(url, payload)
+  //   .then((postResponse) => {
+  //        handleComparisonData(postResponse.data);
+  //     }
+  //   )
+  //   .catch((errors) => {
+  //     console.error(errors);
+  //     setComparisonLoading(false)
+  //   })
+  // }
+
+  function handleComparison() {
+
+  }
+
+  
 
   // columns for team1 table
   const columns1 = [
@@ -223,6 +301,11 @@ function App() {
     { dataField: 'tov', text: 'TOV' },
   ]
 
+  const dataSourceOptions = [
+    { name: 'Predicted', value: false},
+    { name: 'Last Season', valus: true},
+  ];
+
   return (
     <div className="App">
       <header className="App-header">
@@ -249,10 +332,27 @@ function App() {
             <Button variant="primary" onClick={() => handlePlayerAdd(2)}>
               Add to Team 2
             </Button>
-            <Button variant="primary" onClick={() => handleComparison()}>
+            <Button variant="primary" onClick={() => handleComparisonNew()}>
               Compare Teams
             </Button>
           </Form>
+        </Row>
+        <Row>
+          <ButtonGroup toggle className="mb=2">
+            {dataSourceOptions.map((radio, idx) => (
+              <ToggleButton 
+                key={idx}
+                type="radio"
+                variant="secondary"
+                name="radio"
+                value={radio.value}
+                checked={showLastSeason === radio.value}
+                onChange={(e) => setshowLastSeason(e.currentTarget.value)}
+                >
+                  {radio.name}
+                </ToggleButton>
+            ))}
+          </ButtonGroup>
         </Row>
         <Row className="App-container">
           <Col xs={10} md={6}>
@@ -267,7 +367,7 @@ function App() {
                 ) : (
                   <BootstrapTable 
                     keyField='name' 
-                    data={ playerData1 }
+                    data={ showLastSeason ? predData1 : playerData1 }
                     columns={ columns1 }
                     striped
                     bordered={false}
@@ -289,7 +389,7 @@ function App() {
                 ) : (
                   <BootstrapTable 
                     keyField='name' 
-                    data={ playerData2 } 
+                    data={ showLastSeason ? predData2 : playerData2 } 
                     columns={ columns2 }
                     striped
                     bordered={false}
