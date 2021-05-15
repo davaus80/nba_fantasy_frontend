@@ -9,3 +9,4 @@ I hope to allow the following funcionality:
 3. Allow users to select which categories they use and display how much player value changes for their build (IN P
 
 This project is built using React. In particular, the create-react-app base was used as a starting point.
+The main code relating to webpage construction can be found in src/App.js
